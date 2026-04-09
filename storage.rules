@@ -1,0 +1,26 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── Uploads ───────────────────────────────────────────────────────────────
+    // Path: uploads/{userId}/{folderId}/{filename}
+
+    match /uploads/{userId}/{allPaths=**} {
+      // Only the owning user can read/write their uploads
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null &&
+                      request.auth.uid == userId &&
+                      // Max 50 MB
+                      request.resource.size <= 50 * 1024 * 1024 &&
+                      // Allow images, PDFs, Office docs, CSV
+                      request.resource.contentType.matches('image/.*') ||
+                      request.resource.contentType == 'application/pdf' ||
+                      request.resource.contentType == 'text/csv' ||
+                      request.resource.contentType == 'application/vnd.ms-excel' ||
+                      request.resource.contentType.matches('application/vnd.openxmlformats.*') ||
+                      request.resource.contentType.matches('application/msword') ||
+                      request.resource.contentType.matches('application/vnd.ms-word.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

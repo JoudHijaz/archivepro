@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // ── Users ─────────────────────────────────────────────────────────────────
+
+    match /users/{userId} {
+      // Any signed-in user can read their own profile; admins can read all
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+      // Only the user themselves or admins can write (create/update)
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // ── Files ─────────────────────────────────────────────────────────────────
+
+    match /files/{fileId} {
+      // Owner, users the file is shared with, or admins can read
+      allow read: if isSignedIn() && (
+        resource.data.uploadedBy == request.auth.uid ||
+        resource.data.isPublic == true ||
+        request.auth.uid in resource.data.sharedWith ||
+        isAdmin()
+      );
+      // Only signed-in users can create; must set themselves as owner
+      allow create: if isSignedIn() &&
+        request.resource.data.uploadedBy == request.auth.uid;
+      // Owner or admin can update/delete
+      allow update: if isSignedIn() && (
+        resource.data.uploadedBy == request.auth.uid || isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.uploadedBy == request.auth.uid || isAdmin()
+      );
+    }
+
+    // ── Activity logs ─────────────────────────────────────────────────────────
+
+    match /activity/{logId} {
+      // Users see their own logs; admins see all
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      // Logs are written by the owning user only
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false; // logs are immutable
+    }
+
+    // ── Folders ───────────────────────────────────────────────────────────────
+
+    match /folders/{folderId} {
+      allow read: if isSignedIn() && (
+        resource.data.createdBy == request.auth.uid || isAdmin()
+      );
+      allow create: if isSignedIn() &&
+        request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if isSignedIn() && (
+        resource.data.createdBy == request.auth.uid || isAdmin()
+      );
+    }
+  }
+}
