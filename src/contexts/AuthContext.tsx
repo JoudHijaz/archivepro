@@ -37,24 +37,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function fetchProfile(uid: string) {
-    const snap = await getDoc(doc(db, 'users', uid));
-    if (snap.exists()) {
-      setUserProfile({ ...snap.data(), uid } as UserProfile);
+    try {
+      const snap = await getDoc(doc(db, 'users', uid));
+      if (snap.exists()) {
+        setUserProfile({ ...snap.data(), uid } as UserProfile);
+      }
+    } catch {
+      // Firestore rules not yet deployed — profile loads as null
     }
   }
 
   async function login(email: string, password: string) {
     const cred = await signInWithEmailAndPassword(auth, email, password);
-    await updateDoc(doc(db, 'users', cred.user.uid), {
+    // Non-critical Firestore updates — don't block or fail login if they error
+    updateDoc(doc(db, 'users', cred.user.uid), {
       lastLoginAt: serverTimestamp(),
-    });
-    // log activity
-    await setDoc(doc(db, 'activity', `${cred.user.uid}_${Date.now()}`), {
+    }).catch(() => {});
+    setDoc(doc(db, 'activity', `${cred.user.uid}_${Date.now()}`), {
       userId: cred.user.uid,
       userName: cred.user.displayName ?? email,
       action: 'login',
       createdAt: serverTimestamp(),
-    });
+    }).catch(() => {});
   }
 
   async function register(email: string, password: string, displayName: string) {
