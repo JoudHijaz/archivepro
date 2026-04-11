@@ -8,7 +8,7 @@ import { User, Lock, HardDrive, Files } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export function ProfilePage() {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, refreshProfile } = useAuth();
   const [name, setName] = useState(userProfile?.displayName ?? '');
   const [savingProfile, setSavingProfile] = useState(false);
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
@@ -21,6 +21,7 @@ export function ProfilePage() {
     try {
       await updateProfile(currentUser, { displayName: name });
       await updateDoc(doc(db, 'users', currentUser.uid), { displayName: name });
+      await refreshProfile();
       toast.success('Profile updated');
     } catch {
       toast.error('Failed to update profile');

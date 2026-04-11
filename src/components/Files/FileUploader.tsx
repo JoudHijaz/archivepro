@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, X, CheckCircle, AlertCircle, Loader2, CloudUpload } from 'lucide-react';
 import {
@@ -64,8 +64,10 @@ export function FileUploader({ onUploaded }: Props) {
   });
 
   async function startUpload() {
-    if (!currentUser || !userProfile) return;
+    if (!currentUser) return;
+    const displayName = userProfile?.displayName ?? currentUser.displayName ?? currentUser.email ?? 'Unknown';
     setUploading(true);
+    let successCount = 0;
 
     for (const task of queue.filter((t) => t.status === 'pending')) {
       updateTask(task.id, { status: 'uploading', progress: 0 });
@@ -92,22 +94,22 @@ export function FileUploader({ onUploaded }: Props) {
           pathRef,
           url,
           currentUser.uid,
-          userProfile.displayName,
+          displayName,
           'root',
           tags,
           description
         );
 
         updateTask(task.id, { status: 'success', result });
+        successCount++;
       } catch (err: any) {
         updateTask(task.id, { status: 'error', error: err.message ?? 'Upload failed' });
       }
     }
 
     setUploading(false);
-    const success = queue.filter((t) => t.status !== 'error').length;
-    if (success > 0) {
-      toast.success(`${success} file(s) uploaded successfully`);
+    if (successCount > 0) {
+      toast.success(`${successCount} file(s) uploaded successfully`);
       onUploaded?.();
     }
   }

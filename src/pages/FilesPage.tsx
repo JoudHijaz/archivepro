@@ -68,7 +68,7 @@ export function FilesPage() {
   async function handleDelete(file: ArchiveFile) {
     if (!window.confirm(`Delete "${file.name}"?`)) return;
     try {
-      await deleteFile(file.id, file.storagePath, currentUser!.uid, userProfile!.displayName, file.name);
+      await deleteFile(file.id, file.storagePath, currentUser!.uid, userProfile!.displayName, file.name, file.size);
       setFiles((prev) => prev.filter((f) => f.id !== file.id));
       toast.success('File deleted');
     } catch {
@@ -81,7 +81,7 @@ export function FilesPage() {
     const toDelete = files.filter((f) => selected.has(f.id));
     try {
       for (const f of toDelete) {
-        await deleteFile(f.id, f.storagePath, currentUser!.uid, userProfile!.displayName, f.name);
+        await deleteFile(f.id, f.storagePath, currentUser!.uid, userProfile!.displayName, f.name, f.size);
       }
       setFiles((prev) => prev.filter((f) => !selected.has(f.id)));
       setSelected(new Set());
@@ -272,7 +272,16 @@ export function FilesPage() {
       )}
 
       {/* Preview modal */}
-      {preview && <FilePreview file={preview} onClose={() => setPreview(null)} />}
+      {preview && (
+        <FilePreview
+          file={preview}
+          onClose={() => setPreview(null)}
+          onUpdate={(updated) => {
+            setFiles((prev) => prev.map((f) => f.id === updated.id ? updated : f));
+            setPreview(updated);
+          }}
+        />
+      )}
     </div>
   );
 }

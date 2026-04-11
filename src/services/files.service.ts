@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   limit,
   startAfter,
+  increment,
   QueryDocumentSnapshot,
   DocumentData,
   writeBatch,
@@ -107,6 +108,12 @@ export async function saveFileMetadata(
 
   const docRef = await addDoc(collection(db, FILES_COLLECTION), data);
 
+  // Update user storage stats (non-blocking)
+  updateDoc(doc(db, 'users', userId), {
+    fileCount: increment(1),
+    storageUsed: increment(file.size),
+  }).catch(() => {});
+
   await logActivity(userId, userName, 'upload', docRef.id, file.name);
 
   return { id: docRef.id, ...data } as unknown as ArchiveFile;
@@ -190,26 +197,43 @@ export async function deleteFile(
   storagePath: string,
   userId: string,
   userName: string,
-  fileName: string
+  fileName: string,
+  fileSize = 0
 ): Promise<void> {
   const storageRef = ref(storage, storagePath);
   await deleteObject(storageRef);
   await deleteDoc(doc(db, FILES_COLLECTION, fileId));
+
+  // Update user storage stats (non-blocking)
+  updateDoc(doc(db, 'users', userId), {
+    fileCount: increment(-1),
+    storageUsed: increment(-fileSize),
+  }).catch(() => {});
+
   await logActivity(userId, userName, 'delete', fileId, fileName);
 }
 
 export async function bulkDeleteFiles(
-  files: Array<{ id: string; storagePath: string }>,
+  files: Array<{ id: string; storagePath: string; size?: number }>,
   userId: string,
   userName: string
 ): Promise<void> {
   const batch = writeBatch(db);
+  let totalSize = 0;
   for (const f of files) {
     const storageRef = ref(storage, f.storagePath);
     await deleteObject(storageRef);
     batch.delete(doc(db, FILES_COLLECTION, f.id));
+    totalSize += f.size ?? 0;
   }
   await batch.commit();
+
+  // Update user storage stats (non-blocking)
+  updateDoc(doc(db, 'users', userId), {
+    fileCount: increment(-files.length),
+    storageUsed: increment(-totalSize),
+  }).catch(() => {});
+
   await logActivity(userId, userName, 'delete', undefined, `${files.length} files`);
 }
 

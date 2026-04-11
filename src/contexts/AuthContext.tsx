@@ -20,6 +20,7 @@ interface AuthContextValue {
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  refreshProfile: () => Promise<void>;
   isAdmin: boolean;
 }
 
@@ -100,6 +101,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   }
 
+  async function refreshProfile() {
+    if (currentUser) await fetchProfile(currentUser.uid);
+  }
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
@@ -121,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     resetPassword,
+    refreshProfile,
     isAdmin: userProfile?.role === 'admin',
   };
 
